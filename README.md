@@ -62,7 +62,8 @@ SIGEVA_INSTANCIA_B=CONICET
 Instancias válidas: `UNS`, `CONICET`, `CIC`, `CVAR`. El parser de PDF
 (`src/extractors/pdf_sigeva.py`) es genérico: las cuatro instancias
 comparten el mismo layout de secciones (mismo software SIGEVA, distinta
-marca institucional), así que sirve para cualquiera sin cambios.
+marca institucional), así que sirve para cualquiera sin cambios — validado
+contra exports reales de tres de las cuatro (UNS, CIC, CONICET).
 
 ## Tests
 
@@ -91,11 +92,25 @@ etiquetas distintas entre plataformas (ej. "Artículos en Revistas" vs
 
 ## El parser de PDF: qué sí y qué no
 
-Validado contra exports reales de dos instancias distintas. Parsea las
-secciones de antecedentes en sentido estricto: artículos, trabajos en
-eventos (publicados y no publicados), tesis, demás producciones, y
-servicios. Limitaciones conocidas — ver el docstring de
-`src/extractors/pdf_sigeva.py` para el detalle:
+Validado contra exports reales de tres instancias distintas (UNS, CIC,
+CONICET) — mismo layout de secciones, sirve sin cambios. Usa `pdfplumber`
+(no `pypdf`) porque reconstruye el orden de lectura visual del PDF; esto es
+imprescindible para las secciones con formato de formulario en dos
+columnas, donde `pypdf` devuelve etiquetas y valores en el orden del
+content stream (todas las etiquetas de un lado, después todos los valores),
+no en el orden en que se ven en pantalla.
+
+Parsea:
+- **Citas** (artículos, trabajos en eventos publicados/no publicados,
+  tesis, demás producciones, servicios).
+- **CARGOS - Docencia** (nivel superior universitario/posgrado): formato
+  de formulario etiqueta-valor, con un único regex encadenado porque el
+  orden de campos es fijo. Detectó desincronizaciones reales entre
+  instancias (un cargo docente presente en una plataforma y ausente en las
+  otras, una fecha de fin de cargo que difiere).
+
+Limitaciones conocidas — ver el docstring de `src/extractors/pdf_sigeva.py`
+para el detalle:
 
 - No hay DOI/ISBN en los PDFs de CV observados hasta ahora.
 - El campo `autores` de "trabajos en eventos" no se separa de forma
@@ -104,8 +119,9 @@ servicios. Limitaciones conocidas — ver el docstring de
   `anio` sí están validados.
 - Un título que contenga ". " seguido de mayúscula puede cortarse antes de
   lo debido (heurística de texto, no un parser gramatical completo).
-- CARGOS, FINANCIAMIENTO CYT y FORMACION DE RRHH usan un layout de
-  formulario multilínea muy distinto al de las secciones de arriba — no se
+- DOCENCIA nivel básico/medio, CARGOS EN GESTION INSTITUCIONAL,
+  FINANCIAMIENTO CYT y FORMACION DE RRHH usan el mismo tipo de layout de
+  formulario que CARGOS - Docencia pero con otras etiquetas — no se
   parsean todavía, queda para una etapa siguiente.
 
 ## Estado de los datos
@@ -113,5 +129,5 @@ servicios. Limitaciones conocidas — ver el docstring de
 Los JSON de ejemplo en `data/` son ficticios (no un export real) — ver
 `data/README.md` para el detalle de qué casos de matching prueba cada
 registro. El rubro `RubroTipo` está basado en la taxonomía real del "Banco
-de Datos" de SIGEVA/CONICET, confirmada además contra dos PDFs de CV reales
-de dos instancias distintas.
+de Datos" de SIGEVA/CONICET, confirmada además contra tres PDFs de CV
+reales de tres instancias distintas.

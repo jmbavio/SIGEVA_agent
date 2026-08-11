@@ -1,11 +1,13 @@
 """Tests del parser de PDF de SIGEVA sobre texto ya extraído (fabricado acá,
 no un PDF real — evita depender de datos personales de nadie). Las mismas
-funciones fueron validadas manualmente contra dos exports reales (UNS y
-CIC) antes de escribir estos tests; ver docstring de pdf_sigeva.py."""
+funciones fueron validadas manualmente contra tres exports reales (UNS,
+CIC, CONICET) antes de escribir estos tests; ver docstring de
+pdf_sigeva.py."""
 from src.extractors.pdf_sigeva import (
     _extraer_bloque_seccion,
     _parsear_articulos,
     _parsear_bloque_simple,
+    _parsear_cargos_docencia,
     _parsear_eventos,
     _parsear_servicios,
     ENCABEZADOS_SECCION,
@@ -119,3 +121,41 @@ def test_parsear_bloque_simple_extrae_el_ultimo_anio_mencionado():
 def test_parsear_bloque_simple_vacio_no_genera_registros():
     assert _parsear_bloque_simple("") == []
     assert _parsear_bloque_simple(None) == []
+
+
+def test_parsear_cargos_docencia_con_etiquetas_completas():
+    bloque = (
+        "Fecha inicio: 08-2024 Hasta: Institución: UNIVERSIDAD DE EJEMPLO Cargo: Profesor adjunto "
+        "Tipo de honorarios: Rentado Dedicación: Exclusiva Dedicación horaria semanal: 40 horas o más "
+        "Condición: Regular o por concurso Nivel educativo: Universitario de grado "
+        "Actividades curriculares: Actividad Profesor responsable Cátedra de Ejemplo Juan Pérez "
+        "Fecha inicio: 03-2018 Hasta: 03-2020 Institución: OTRA UNIVERSIDAD Cargo: Profesor titular "
+        "Tipo de honorarios: Rentado Dedicación: Simple Dedicación horaria semanal: De 0 hasta 19 horas "
+        "Condición: Por contrato Nivel educativo: Universitario de grado "
+        "Actividades curriculares: Actividad Profesor responsable Otra Cátedra Ana Gómez"
+    )
+    registros = _parsear_cargos_docencia(bloque)
+    assert len(registros) == 2
+    assert registros[0]["titulo"] == "Profesor adjunto - UNIVERSIDAD DE EJEMPLO"
+    assert registros[0]["anio"] == 2024
+    assert registros[0]["hasta"] is None
+    assert registros[1]["titulo"] == "Profesor titular - OTRA UNIVERSIDAD"
+    assert registros[1]["anio"] == 2018
+    assert registros[1]["hasta"] == "03-2020"
+
+
+def test_parsear_cargos_docencia_con_etiquetas_truncadas_sin_dos_puntos():
+    # Caso real observado en un export de CIC: algunas etiquetas del
+    # formulario pierden los dos puntos ("Nivel" en vez de "Nivel
+    # educativo:", "Actividades" en vez de "Actividades curriculares:").
+    bloque = (
+        "Fecha inicio: 08-2024 Hasta: Institución: UNIVERSIDAD DE EJEMPLO Cargo: Profesor adjunto "
+        "Tipo de honorarios: Rentado Dedicación: Exclusiva Dedicación horaria 40 horas o más "
+        "Condición: Regular o por concurso Nivel Universitario de grado "
+        "Actividades Actividad Profesor responsable Cátedra de Ejemplo Juan Pérez"
+    )
+    registros = _parsear_cargos_docencia(bloque)
+    assert len(registros) == 1
+    assert registros[0]["titulo"] == "Profesor adjunto - UNIVERSIDAD DE EJEMPLO"
+    assert registros[0]["nivel_educativo"] == "Universitario de grado"
+    assert "Cátedra de Ejemplo" in registros[0]["actividades_curriculares"]
