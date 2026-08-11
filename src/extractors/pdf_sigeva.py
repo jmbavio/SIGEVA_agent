@@ -14,31 +14,59 @@ esas etiquetas y valores en el orden del content stream del PDF, que no
 coincide con el orden en que se ven en pantalla (mezcla todas las
 etiquetas de un lado, después todos los valores del otro).
 
+Cobertura: se parsean TODAS las secciones de antecedentes del CV (todo lo
+que no es DATOS PERSONALES/EXPERTICIA EN CYT, que son datos personales sin
+equivalente de "antecedente" comparable): Publicaciones (artículos,
+trabajos en eventos publicados/no publicados, tesis, demás producciones),
+Servicios, Formación académica (posgrado/grado/terciario/posdoctorado),
+Formación complementaria (cursos, idiomas), Docencia (nivel superior,
+básico/medio, cursos de posgrado), Cargos en gestión institucional,
+Categorización del programa de incentivos, Formación de RRHH (becarios),
+Financiamiento CyT (proyectos I+D, becas recibidas), Extensión,
+Evaluación (programas/proyectos, trabajos en revistas), y Redes/gestión
+editorial (participación en eventos).
+
+Dos familias de parser según el formato de la sección:
+- **Citas** (artículos, eventos, servicios): un registro es una oración
+  con puntuación, se separan con heurísticas de texto sobre el límite
+  autor/título (ver `_particionar_por_ultimo_limite` /
+  `_particionar_por_primer_limite`).
+- **Formularios** (todo lo demás): pares "Etiqueta: Valor". La mayoría usa
+  `_extraer_campos_por_etiquetas`, que busca cada etiqueta de forma
+  independiente y no depende de que vengan en un orden fijo — importante
+  porque el orden y la presencia de etiquetas varía entre instancias (ver
+  abajo). CARGOS - Docencia y CARGOS EN GESTION INSTITUCIONAL usan un
+  regex encadenado en cambio, porque ahí sí hace falta capturar texto
+  libre sin etiqueta propia (ver sus docstrings).
+
 Limitaciones conocidas (ver README):
 - El export no incluye DOI en ningún caso observado, y el ISBN tampoco
-  aparece en los rubros parseados acá (no hay "Libros" con ISBN en las
-  muestras usadas para validar). El nivel de exact match del diff engine
-  va a disparar poco con datos de PDF.
+  aparece en los rubros parseados acá. El nivel de exact match del diff
+  engine va a disparar poco con datos de PDF.
 - La separación autor/título/revista de artículos se resuelve con
-  heurísticas de texto (ver `_particionar_por_ultimo_limite`), no con un
-  parser gramatical completo. Funciona bien en la práctica (validado con
-  ~50 registros reales) pero un título que contenga ". " seguido de
-  mayúscula puede cortarse antes de lo debido (ver caso "VALVULOAORTOPATÍA
-  BICÚSPIDE." en el README de datos).
+  heurísticas de texto, no con un parser gramatical completo. Un título
+  que contenga ". " seguido de mayúscula puede cortarse antes de lo
+  debido (ver caso "VALVULOAORTOPATÍA BICÚSPIDE." en el README de datos).
 - En "trabajos en eventos" el campo `autores` no se separa de forma
-  confiable de la cola del registro anterior (no hay un separador fijo
-  ahí) — se deja en `None`. `titulo` y `anio` sí están validados.
-- CARGOS - Docencia (nivel superior) sí se parsea, con las etiquetas
-  encadenadas en un único regex (`_CAMPO_CARGO_RE`) porque el formato es
-  de formulario, no de cita. CIC trunca algunas etiquetas sin dos puntos
-  ("Nivel" en vez de "Nivel educativo:") — contemplado en el regex.
-  DOCENCIA nivel básico/medio, CARGOS EN GESTION INSTITUCIONAL,
-  FINANCIAMIENTO CYT y FORMACION DE RRHH todavía no se parsean — mismo
-  layout de formulario, pero con otras etiquetas; queda para una
-  siguiente etapa.
-- Tesis y "Demás producciones c-t publicados" se parsean con un fallback
-  más simple (best-effort), validado contra un solo registro real cada
-  uno — con más muestras probablemente haga falta ajustar el regex.
+  confiable de la cola del registro anterior — se deja en `None`.
+  `titulo` y `anio` sí están validados.
+- **Las mismas etiquetas varían entre instancias**, y no siempre por
+  truncamiento consistente — encontrado validando contra datos reales:
+  - CIC trunca varias etiquetas largas sin los dos puntos ("Nivel" en vez
+    de "Nivel educativo:", "Año de" en vez de "Año de categorización:",
+    "Título de la" en vez de "Título de la revista:") — y lo hace de
+    forma *inconsistente* entre registros del mismo documento (a veces la
+    misma etiqueta sale completa, a veces truncada).
+  - CONICET usa una etiqueta totalmente distinta para el nombre de la
+    revista evaluada ("Revista seleccionada:" en vez de "Título de la
+    revista:") — no es truncamiento, es otro texto.
+  - El campo "Cargo:" de CARGOS EN GESTION INSTITUCIONAL tiene su valor
+    en dos posiciones posibles según la instancia (ver
+    `_parsear_cargos_gestion`): UNS lo deja sin valor adyacente y el
+    nombre real aparece como texto libre más adelante; CONICET lo pone
+    donde se espera.
+  Cada uno de estos casos está cubierto con un test específico en
+  tests/test_pdf_sigeva.py.
 """
 from __future__ import annotations
 
@@ -63,31 +91,37 @@ _CABECERA_PAGINA_RE = re.compile(r"^Curr[íi]culum vitae\b")
 # impresión:" y/o "Página N de M" (a veces en la misma línea, a veces no).
 _PIE_PAGINA_RE = re.compile(r"^(Fecha de impresión:.*|(\d{2}/\d{2}/\d{4}\s*)?Página\s+\d+\s+de\s+\d+.*)$")
 
-# Todos los encabezados de sección conocidos del layout SIGEVA. Se usan como
-# límites al recortar el bloque de texto de una sección puntual.
+# Todos los encabezados de sección conocidos del layout SIGEVA, verificados
+# letra por letra (incluido el espaciado) contra el texto real extraído con
+# pdfplumber de las 3 instancias validadas (UNS, CIC, CONICET). Se usan
+# como límites al recortar el bloque de texto de una sección puntual — un
+# espaciado que no coincide exactamente hace que ese límite nunca matchee
+# (bug real que hubo acá: "FORMACION COMPLEMENTARIA -  Idiomas:" con doble
+# espacio, copiado mal de una vista renderizada, nunca encontraba nada).
 ENCABEZADOS_SECCION = (
     "DATOS PERSONALES - IDENTIFICACION",
     "DATOS PERSONALES - DIRECCION RESIDENCIAL",
     "DATOS PERSONALES - LUGAR DE TRABAJO",
     "EXPERTICIA EN CYT",
+    # Encabezados de grupo sin ":" — no se parsean como sección propia,
+    # pero sí sirven de límite para no filtrarse dentro del bloque de la
+    # sección anterior (ver bug real: "ANTECEDENTES" quedaba pegado al
+    # final de CATEGORIZACION DEL PROGRAMA DE INCENTIVOS).
     "FORMACION",
-    "FORMACION ACADEMICA - Nivel Universitario de Posgrado/Doctorado:",
-    "FORMACION ACADEMICA -  Nivel Universitario de Posgrado/Doctorado:",
-    "FORMACION ACADEMICA - Nivel Universitario de Grado:",
-    "FORMACION ACADEMICA -  Nivel Universitario de Grado:",
-    "FORMACION ACADEMICA - Nivel Terciario no Universitario:",
-    "FORMACION ACADEMICA -  Nivel Terciario no Universitario:",
-    "FORMACION ACADEMICA -Nivel Terciario no Universitario:",
-    "FORMACION COMPLEMENTARIA -  Posdoctorado:",
-    "FORMACION COMPLEMENTARIA -  Cursos de posgrado y/o capacit. extracurriculares:",
-    "FORMACION COMPLEMENTARIA -  Idiomas:",
     "CARGOS",
+    "ANTECEDENTES",
+    "PRODUCCION",
+    "FORMACION ACADEMICA - Nivel Universitario de Posgrado/Doctorado:",
+    "FORMACION ACADEMICA - Nivel Universitario de Grado:",
+    "FORMACION ACADEMICA - Nivel Terciario no Universitario:",
+    "FORMACION COMPLEMENTARIA - Posdoctorado:",
+    "FORMACION COMPLEMENTARIA - Cursos de posgrado y/o capacit. extracurriculares:",
+    "FORMACION COMPLEMENTARIA - Idiomas:",
     "DOCENCIA - Nivel superior universitario y/o posgrado:",
     "DOCENCIA - Nivel básico/medio:",
     "DOCENCIA - Cursos de posgrado y capacitaciones extracurriculares",
     "CARGOS EN GESTION INSTITUCIONAL:",
     "CATEGORIZACION DEL PROGRAMA DE INCENTIVOS:",
-    "ANTECEDENTES",
     "FORMACION DE RRHH EN CYT - Becarios:",
     "FINANCIAMIENTO CYT - Proyectos I+D:",
     "FINANCIAMIENTO CYT - Becas recibidas:",
@@ -147,6 +181,44 @@ def _autores_desde_texto(autores: str | None) -> list[str]:
     if not autores:
         return []
     return [a.strip() for a in autores.split(";") if a.strip()]
+
+
+def _anio_desde_texto(texto: str | None) -> int | None:
+    if not texto:
+        return None
+    m = re.search(r"(19|20)\d{2}", texto)
+    return int(m.group()) if m else None
+
+
+# --- Utilidades genéricas para secciones con layout de formulario --------
+# A diferencia de las secciones de citas (artículos, eventos, servicios),
+# estas secciones son pares "Etiqueta: Valor" cuyo orden y presencia varía
+# entre sub-secciones y entre instancias (CIC trunca varias etiquetas, a
+# veces sin los dos puntos). En vez de encadenar un regex gigante por campo
+# fijo (como en CARGOS - Docencia), acá cada campo se busca de forma
+# independiente y su valor es "todo lo que sigue hasta la próxima etiqueta
+# conocida que aparezca después" — tolera campos ausentes y fuera de orden.
+def _dividir_por_ancla(bloque: str, ancla: str) -> list[str]:
+    posiciones = [m.start() for m in re.finditer(ancla, bloque)]
+    if not posiciones:
+        return []
+    posiciones.append(len(bloque))
+    return [bloque[posiciones[i] : posiciones[i + 1]].strip() for i in range(len(posiciones) - 1)]
+
+
+def _extraer_campos_por_etiquetas(texto: str, etiquetas: dict[str, str]) -> dict[str, str | None]:
+    posiciones = []
+    for nombre, patron in etiquetas.items():
+        m = re.search(patron, texto)
+        if m:
+            posiciones.append((m.start(), m.end(), nombre))
+    posiciones.sort()
+    resultado: dict[str, str | None] = dict.fromkeys(etiquetas)
+    for i, (_, fin_etiqueta, nombre) in enumerate(posiciones):
+        fin = posiciones[i + 1][0] if i + 1 < len(posiciones) else len(texto)
+        valor = texto[fin_etiqueta:fin].strip().strip(".").strip()
+        resultado[nombre] = valor or None
+    return resultado
 
 
 def _texto_completo(ruta: Path) -> str:
@@ -367,6 +439,303 @@ def _parsear_cargos_docencia(bloque: str) -> list[dict]:
     return resultado
 
 
+# --- Secciones de formulario genéricas ------------------------------------
+# Cada entrada: (nombre_ancla_de_registro, {campo: patron_etiqueta},
+# funcion_que_arma_titulo_y_anio_a_partir_de_los_campos). Se usan con
+# _parsear_formulario más abajo.
+
+
+def _parsear_formulario(bloque: str, ancla: str, campos: dict[str, str], armar: Callable[[dict], dict]) -> list[dict]:
+    resultado = []
+    for trozo in _dividir_por_ancla(bloque, ancla):
+        valores = _extraer_campos_por_etiquetas(trozo, campos)
+        extra = armar(valores)
+        resultado.append({"autores": None, "raw_text": trozo, **extra})
+    return resultado
+
+
+_CAMPOS_FORMACION_ACADEMICA = {
+    "fecha_inicio": r"Fecha inicio:",
+    "fecha_egreso": r"Fecha egreso:",
+    "carrera": r"Denominaci[oó]n de la(?:\s+carrera)?:?",
+    "titulo": r"T[ií]tulo:",
+    "institucion": r"(?:Instituciones otorgantes del t[ií]tulo|Instituci[oó]n):",
+}
+
+
+def _parsear_formacion_academica(bloque: str) -> list[dict]:
+    def armar(v):
+        titulo = v["titulo"] or v["carrera"] or "Formación académica"
+        return {"titulo": _limpiar_titulo(titulo), "anio": _anio_desde_texto(v["fecha_egreso"] or v["fecha_inicio"])}
+
+    # "Situación del nivel:" se usó de ancla en un principio, pero CIC la
+    # trunca de forma inconsistente (a veces "Situación del", sin "nivel:"
+    # ni ":") — "Fecha inicio:" es más confiable y alcanza porque cada
+    # nivel de formación típicamente tiene un solo registro.
+    return _parsear_formulario(bloque, r"Fecha inicio:", _CAMPOS_FORMACION_ACADEMICA, armar)
+
+
+_CAMPOS_POSDOCTORADO = {
+    "fecha_inicio": r"Fecha inicio:",
+    "fecha_fin": r"Fecha finalizaci[oó]n:",
+    "titulo_proyecto": r"T[ií]tulo del trabajo o proyecto de(?:\s+investigaci[oó]n)?:",
+    "institucion": r"Instituci[oó]n en que realiza o realiz[oó] el curso:",
+}
+
+
+def _parsear_posdoctorado(bloque: str) -> list[dict]:
+    def armar(v):
+        titulo = v["titulo_proyecto"] or "Posdoctorado"
+        return {"titulo": _limpiar_titulo(titulo), "anio": _anio_desde_texto(v["fecha_inicio"])}
+
+    return _parsear_formulario(bloque, r"Fecha inicio:", _CAMPOS_POSDOCTORADO, armar)
+
+
+_CAMPOS_CURSO_EXTRACURRICULAR = {
+    "fecha_inicio": r"Fecha inicio:",
+    "fecha_fin": r"Fecha finalizaci[oó]n:",
+    "curso": r"Denominaci[oó]n del curso:",
+    "institucion": r"Instituci[oó]n en que realiza o realiz[oó] el curso:",
+}
+
+
+def _parsear_cursos_extracurriculares(bloque: str) -> list[dict]:
+    def armar(v):
+        titulo = v["curso"] or "Curso de posgrado/capacitación"
+        return {"titulo": _limpiar_titulo(titulo), "anio": _anio_desde_texto(v["fecha_inicio"])}
+
+    return _parsear_formulario(bloque, r"Fecha inicio:", _CAMPOS_CURSO_EXTRACURRICULAR, armar)
+
+
+_CAMPOS_IDIOMA = {
+    "idioma": r"Idioma:",
+    "nivel": r"Nivel de dominio del idioma:",
+    "certificado": r"Certificado/s obtenido/s:",
+    "institucion": r"Instituci[oó]n emisora del certificado:",
+    "anio": r"Año de obtenci[oó]n del certificado:",
+}
+
+
+def _parsear_idiomas(bloque: str) -> list[dict]:
+    def armar(v):
+        titulo = f"{v['idioma']} ({v['nivel']})" if v["idioma"] and v["nivel"] else (v["idioma"] or "Idioma")
+        return {"titulo": _limpiar_titulo(titulo), "anio": _anio_desde_texto(v["anio"])}
+
+    return _parsear_formulario(bloque, r"Idioma:", _CAMPOS_IDIOMA, armar)
+
+
+_CAMPOS_DOCENCIA_SIMPLE = {
+    "fecha_inicio": r"Fecha inicio:",
+    "hasta": r"Hasta:",
+    "institucion": r"Instituci[oó]n:",
+    "cargo": r"Cargo:",
+}
+
+
+def _parsear_docencia_simple(bloque: str) -> list[dict]:
+    def armar(v):
+        titulo = f"{v['cargo']} - {v['institucion']}" if v["institucion"] else (v["cargo"] or "Docencia")
+        return {"titulo": _limpiar_titulo(titulo), "anio": _anio_desde_texto(v["fecha_inicio"])}
+
+    return _parsear_formulario(bloque, r"Fecha inicio:", _CAMPOS_DOCENCIA_SIMPLE, armar)
+
+
+# CARGOS EN GESTION INSTITUCIONAL: el nombre del cargo (ej. "Consejero
+# Departamental") aparece en dos posiciones distintas según la instancia:
+# en CONICET tiene valor normal justo después de "Cargo:"; en UNS la
+# etiqueta "Cargo:" queda sin valor adyacente y el nombre real aparece como
+# texto libre más adelante, entre "Dedicación horaria semanal:" y "Tipo de
+# función desempeñada:". El regex captura las dos posiciones posibles
+# (cargo_inline / cargo_flotante) y usa la que no esté vacía.
+_CAMPO_CARGO_GESTION_RE = re.compile(
+    r"Fecha inicio:\s*(?P<fecha_inicio>\d{2}/\d{2}/\d{4})\s*"
+    r"Fin:\s*(?P<fin>\d{2}/\d{2}/\d{4})?\s*"
+    r"Cargo:\s*(?P<cargo_inline>.*?)\s*"
+    # "horas" restringido a los valores conocidos del combo de SIGEVA (no
+    # un comodín genérico): con dos grupos ".*?" no-codiciosos seguidos,
+    # el backtracking puede volcar todo en cargo_flotante y dejar horas
+    # vacío — pasó en la práctica al validar contra UNS.
+    r"Dedicaci[oó]n horaria(?:\s+semanal)?:?\s*"
+    r"(?P<horas>De \d+ hasta \d+ horas|\d+ horas o m[aá]s|Entre \d+ y \d+ horas)?\s*"
+    r"(?P<cargo_flotante>.*?)\s*"
+    r"Tipo de funci[oó]n desempe[ñn]ada:\s*(?P<funcion>.*?)\s*"
+    r"Instituci[oó]n:\s*(?P<institucion>.*?)\s*"
+    r"(?=Fecha inicio:|\Z)",
+    re.DOTALL,
+)
+
+
+def _parsear_cargos_gestion(bloque: str) -> list[dict]:
+    resultado = []
+    for m in _CAMPO_CARGO_GESTION_RE.finditer(bloque):
+        g = m.groupdict()
+        cargo = g["cargo_inline"].strip() or g["cargo_flotante"].strip()
+        institucion = g["institucion"].strip()
+        titulo = f"{cargo} - {institucion}" if institucion else cargo or "Cargo de gestión"
+        resultado.append(
+            {
+                "autores": None,
+                "titulo": _limpiar_titulo(titulo),
+                "anio": _anio_desde_texto(g["fecha_inicio"]),
+                "funcion": g["funcion"].strip(),
+                "raw_text": m.group(0).strip(),
+            }
+        )
+    return resultado
+
+
+_CAMPOS_CATEGORIZACION = {
+    "fecha_inicio": r"Fecha inicio:",
+    "hasta": r"Hasta:",
+    "anio_categorizacion": r"Año de(?:\s+categorizaci[oó]n)?:?",
+    "categoria": r"Categor[ií]a en el Programa de Incentivos:",
+    "institucion": r"Instituci[oó]n:",
+}
+
+
+def _parsear_categorizacion(bloque: str) -> list[dict]:
+    def armar(v):
+        titulo = f"{v['categoria']} - {v['institucion']}" if v["institucion"] else (v["categoria"] or "Categorización")
+        return {
+            "titulo": _limpiar_titulo(titulo),
+            "anio": _anio_desde_texto(v["anio_categorizacion"] or v["fecha_inicio"]),
+        }
+
+    return _parsear_formulario(bloque, r"Fecha inicio:", _CAMPOS_CATEGORIZACION, armar)
+
+
+_CAMPOS_BECARIO = {
+    "anio_desde": r"Año desde:",
+    "anio_hasta": r"Año(?!\s*desde)(?:\s+hasta)?:?",
+    "nombre": r"Nombre/s:",
+    "apellido": r"Apellido/s:",
+    "institucion_trabajo": r"Instituci[oó]n de trabajo del becario:",
+    "institucion_financiadora": r"Instituci[oó]n financiadora de la [Bb]eca:",
+    "tipo_beca": r"Tipo de beca:",
+    "funcion": r"Funci[oó]n(?:\s+desempe[ñn]ada)?:?",
+}
+
+
+def _parsear_becarios(bloque: str) -> list[dict]:
+    def armar(v):
+        if v["nombre"] or v["apellido"]:
+            titulo = f"Dirección de becario/a: {v['nombre'] or ''} {v['apellido'] or ''}".strip()
+        else:
+            titulo = v["tipo_beca"] or "Becario/a"
+        return {"titulo": _limpiar_titulo(titulo), "anio": _anio_desde_texto(v["anio_desde"])}
+
+    return _parsear_formulario(bloque, r"Año desde:", _CAMPOS_BECARIO, armar)
+
+
+_CAMPOS_PROYECTO = {
+    "tipo_actividad": r"Tipo de actividad de",
+    "denominacion": r"Denominaci[oó]n del proyecto:",
+    "fecha_desde": r"Fecha desde:",
+    "fecha_hasta": r"Fecha hasta:",
+    "descripcion": r"Descripci[oó]n del proyecto:",
+}
+
+
+def _parsear_proyectos(bloque: str) -> list[dict]:
+    def armar(v):
+        titulo = v["denominacion"] or "Proyecto de I+D"
+        return {"titulo": _limpiar_titulo(titulo), "anio": _anio_desde_texto(v["fecha_desde"])}
+
+    return _parsear_formulario(bloque, r"Tipo de actividad de", _CAMPOS_PROYECTO, armar)
+
+
+_CAMPOS_BECA_RECIBIDA = {
+    "fecha_inicio": r"Fecha inicio:",
+    "fin": r"Fin:",
+    "tipo_beca": r"T[ií]po de beca:",
+    "denominacion": r"Denominaci[oó]n de la beca:",
+    "tipo_tareas": r"T[ií]po de tareas:",
+    "institucion_financiadora": r"Instituci[oó]n financiadora de la [Bb]eca:",
+}
+
+
+def _parsear_becas_recibidas(bloque: str) -> list[dict]:
+    def armar(v):
+        titulo = v["denominacion"] or v["tipo_beca"] or "Beca recibida"
+        return {"titulo": _limpiar_titulo(titulo), "anio": _anio_desde_texto(v["fecha_inicio"])}
+
+    return _parsear_formulario(bloque, r"Fecha inicio:", _CAMPOS_BECA_RECIBIDA, armar)
+
+
+_CAMPOS_EXTENSION = {
+    "titulo": r"Titulo:",
+    "fecha_inicio": r"Fecha inicio:",
+    "hasta": r"Hasta:",
+    "funcion": r"Funci[oó]n desempe[ñn]ada:",
+}
+
+
+def _parsear_extension(bloque: str) -> list[dict]:
+    def armar(v):
+        return {"titulo": _limpiar_titulo(v["titulo"] or "Actividad de extensión"), "anio": _anio_desde_texto(v["fecha_inicio"])}
+
+    return _parsear_formulario(bloque, r"Titulo:", _CAMPOS_EXTENSION, armar)
+
+
+_CAMPOS_EVALUACION_PROYECTOS = {
+    "anio_inicio": r"Año inicio:",
+    "anio_fin": r"Año fin:",
+    "tipo_programas": r"Tipos de programas/proyecto evaluados:",
+    "institucion_convocante": r"Instituci[oó]n convocante:",
+}
+
+
+def _parsear_evaluacion_proyectos(bloque: str) -> list[dict]:
+    def armar(v):
+        titulo = v["tipo_programas"] or v["institucion_convocante"] or "Evaluación de programas/proyectos"
+        return {"titulo": _limpiar_titulo(titulo), "anio": _anio_desde_texto(v["anio_inicio"])}
+
+    return _parsear_formulario(bloque, r"Año inicio:", _CAMPOS_EVALUACION_PROYECTOS, armar)
+
+
+# El nombre de la revista tiene DOS etiquetas distintas según la instancia
+# (no es truncamiento): "Título de la revista:" en UNS/CIC, "Revista
+# seleccionada:" en CONICET. CIC además la trunca a "Título de la", a
+# veces sin los dos puntos.
+_ANCLA_EVALUACION_REVISTAS_RE = r"(?:T[ií]tulo de la(?:\s+revista)?|Revista seleccionada):?"
+_CAMPOS_EVALUACION_REVISTAS = {
+    "titulo_revista": _ANCLA_EVALUACION_REVISTAS_RE,
+    "issn": r"ISSN:",
+    "anio_inicio": r"Año inicio:",
+    "anio_fin": r"Año fin:",
+}
+
+
+def _parsear_evaluacion_revistas(bloque: str) -> list[dict]:
+    def armar(v):
+        return {
+            "titulo": _limpiar_titulo(v["titulo_revista"] or "Evaluación de trabajos en revista"),
+            "anio": _anio_desde_texto(v["anio_inicio"]),
+        }
+
+    return _parsear_formulario(bloque, _ANCLA_EVALUACION_REVISTAS_RE, _CAMPOS_EVALUACION_REVISTAS, armar)
+
+
+_CAMPOS_PARTICIPACION_EVENTO = {
+    "nombre_evento": r"Nombre del evento:",
+    "tipo_evento": r"Tipo de evento:",
+    "alcance": r"Alcance geogr[aá]fico:",
+    "anio": r"Año:",
+    "modo_participacion": r"Modo de participaci[oó]n:",
+    "institucion_organizadora": r"Instituci[oó]n organizadora:",
+}
+
+
+def _parsear_participacion_eventos(bloque: str) -> list[dict]:
+    def armar(v):
+        return {
+            "titulo": _limpiar_titulo(v["nombre_evento"] or "Participación en evento"),
+            "anio": _anio_desde_texto(v["anio"]),
+        }
+
+    return _parsear_formulario(bloque, r"Nombre del evento:", _CAMPOS_PARTICIPACION_EVENTO, armar)
+
+
 # --- Tesis / Demás producciones c-t publicados (fallback simple) --------
 _ANIO_RE = re.compile(r"\b(19|20)\d{2}\b")
 
@@ -394,6 +763,63 @@ _SECCIONES_A_PARSEAR: tuple[tuple[str, RubroTipo, Callable[[str], list[dict]]], 
         "REDES, GESTION EDITORIAL Y EVENTOS - Trabajos en eventos c-t no publicados:",
         RubroTipo.TRABAJO_EVENTO_NO_PUBLICADO,
         _parsear_eventos,
+    ),
+    (
+        "FORMACION ACADEMICA - Nivel Universitario de Posgrado/Doctorado:",
+        RubroTipo.FORMACION_ACADEMICA,
+        _parsear_formacion_academica,
+    ),
+    (
+        "FORMACION ACADEMICA - Nivel Universitario de Grado:",
+        RubroTipo.FORMACION_ACADEMICA,
+        _parsear_formacion_academica,
+    ),
+    (
+        "FORMACION ACADEMICA - Nivel Terciario no Universitario:",
+        RubroTipo.FORMACION_ACADEMICA,
+        _parsear_formacion_academica,
+    ),
+    ("FORMACION COMPLEMENTARIA - Posdoctorado:", RubroTipo.FORMACION_ACADEMICA, _parsear_posdoctorado),
+    (
+        "FORMACION COMPLEMENTARIA - Cursos de posgrado y/o capacit. extracurriculares:",
+        RubroTipo.CURSO_CAPACITACION,
+        _parsear_cursos_extracurriculares,
+    ),
+    ("FORMACION COMPLEMENTARIA - Idiomas:", RubroTipo.CURSO_CAPACITACION, _parsear_idiomas),
+    ("DOCENCIA - Nivel básico/medio:", RubroTipo.DOCENCIA, _parsear_docencia_simple),
+    (
+        "DOCENCIA - Cursos de posgrado y capacitaciones extracurriculares",
+        RubroTipo.DOCENCIA,
+        _parsear_docencia_simple,
+    ),
+    ("CARGOS EN GESTION INSTITUCIONAL:", RubroTipo.CARGO_GESTION, _parsear_cargos_gestion),
+    (
+        "CATEGORIZACION DEL PROGRAMA DE INCENTIVOS:",
+        RubroTipo.CATEGORIZACION_INCENTIVOS,
+        _parsear_categorizacion,
+    ),
+    ("FORMACION DE RRHH EN CYT - Becarios:", RubroTipo.DIRECCION_BECARIO, _parsear_becarios),
+    ("FINANCIAMIENTO CYT - Proyectos I+D:", RubroTipo.PROYECTO, _parsear_proyectos),
+    ("FINANCIAMIENTO CYT - Becas recibidas:", RubroTipo.BECA_RECIBIDA, _parsear_becas_recibidas),
+    (
+        "EXTENSION - Comunicación pública de la ciencia y la tecnología:",
+        RubroTipo.EXTENSION,
+        _parsear_extension,
+    ),
+    (
+        "EVALUACION - Evaluación de programas/proyectos de I+D y/o extensión:",
+        RubroTipo.EVALUACION,
+        _parsear_evaluacion_proyectos,
+    ),
+    (
+        "EVALUACION - Evaluación de trabajos en revistas CyT:",
+        RubroTipo.EVALUACION,
+        _parsear_evaluacion_revistas,
+    ),
+    (
+        "REDES, GESTION EDITORIAL Y EVENTOS - Participación u organización de eventos cyt:",
+        RubroTipo.PARTICIPACION_EVENTO,
+        _parsear_participacion_eventos,
     ),
 )
 

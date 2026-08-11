@@ -57,9 +57,16 @@ class RubroTipo(str, Enum):
     DIRECCION_TESIS = "direccion_tesis"
     DIRECCION_INVESTIGADOR = "direccion_investigador"
 
+    # Formación propia (títulos obtenidos, cursos, idiomas)
+    FORMACION_ACADEMICA = "formacion_academica"  # títulos: doctorado, grado, terciario, posdoctorado
+    CURSO_CAPACITACION = "curso_capacitacion"  # cursos de posgrado/extracurriculares, idiomas
+    BECA_RECIBIDA = "beca_recibida"
+
     # Otros
     EVALUACION = "evaluacion"
     EXTENSION = "extension"
+    CATEGORIZACION_INCENTIVOS = "categorizacion_incentivos"
+    PARTICIPACION_EVENTO = "participacion_evento"
     OTRO = "otro"
 
 

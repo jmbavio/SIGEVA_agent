@@ -100,17 +100,30 @@ columnas, donde `pypdf` devuelve etiquetas y valores en el orden del
 content stream (todas las etiquetas de un lado, después todos los valores),
 no en el orden en que se ven en pantalla.
 
-Parsea:
-- **Citas** (artículos, trabajos en eventos publicados/no publicados,
-  tesis, demás producciones, servicios).
-- **CARGOS - Docencia** (nivel superior universitario/posgrado): formato
-  de formulario etiqueta-valor, con un único regex encadenado porque el
-  orden de campos es fijo. Detectó desincronizaciones reales entre
-  instancias (un cargo docente presente en una plataforma y ausente en las
-  otras, una fecha de fin de cargo que difiere).
+Parsea **todas** las secciones de antecedentes del CV (todo lo que no es
+DATOS PERSONALES/EXPERTICIA EN CYT, que son datos personales sin
+equivalente de "antecedente" comparable):
+
+- **Citas** (una oración con puntuación por registro): artículos, trabajos
+  en eventos publicados/no publicados, tesis, demás producciones,
+  servicios.
+- **Formularios** ("Etiqueta: Valor"): formación académica
+  (posgrado/grado/terciario/posdoctorado), formación complementaria
+  (cursos, idiomas), docencia (nivel superior, básico/medio, cursos de
+  posgrado), cargos en gestión institucional, categorización del programa
+  de incentivos, formación de RRHH (becarios), financiamiento CyT
+  (proyectos I+D, becas recibidas), extensión, evaluación (programas y
+  trabajos en revistas), participación en eventos.
+
+Con la cobertura completa, el diff engine encontró desincronizaciones
+reales de varios tipos entre las 3 instancias del mismo investigador: un
+cargo docente presente en una plataforma y ausente en otra, una fecha de
+fin de cargo que difiere, un cargo de gestión institucional adicional en
+una plataforma, y evaluaciones de revistas cargadas en una instancia pero
+no en las otras.
 
 Limitaciones conocidas — ver el docstring de `src/extractors/pdf_sigeva.py`
-para el detalle:
+para el detalle completo:
 
 - No hay DOI/ISBN en los PDFs de CV observados hasta ahora.
 - El campo `autores` de "trabajos en eventos" no se separa de forma
@@ -119,10 +132,13 @@ para el detalle:
   `anio` sí están validados.
 - Un título que contenga ". " seguido de mayúscula puede cortarse antes de
   lo debido (heurística de texto, no un parser gramatical completo).
-- DOCENCIA nivel básico/medio, CARGOS EN GESTION INSTITUCIONAL,
-  FINANCIAMIENTO CYT y FORMACION DE RRHH usan el mismo tipo de layout de
-  formulario que CARGOS - Docencia pero con otras etiquetas — no se
-  parsean todavía, queda para una etapa siguiente.
+- **Las etiquetas de los formularios varían entre instancias**, y no
+  siempre por un truncamiento consistente: CIC trunca varias etiquetas
+  largas sin los dos puntos, y lo hace de forma inconsistente entre
+  registros del mismo documento; CONICET usa una etiqueta totalmente
+  distinta para el nombre de la revista evaluada ("Revista seleccionada:"
+  en vez de "Título de la revista:"). Cada caso encontrado está cubierto
+  con su propio test.
 
 ## Estado de los datos
 
