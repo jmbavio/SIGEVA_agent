@@ -5,3 +5,9 @@ venv/
 .env
 *.egg-info/
 .pytest_cache/
+
+# PDFs de CV reales de SIGEVA: nunca se versionan (contienen datos
+# personales — DNI, domicilio, teléfono, etc.). Guardalos localmente donde
+# quieras y apuntá SIGEVA_RUTA_A/B ahí (ver .env.example).
+*.pdf
+data/pdfs/

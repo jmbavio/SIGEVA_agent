@@ -35,6 +35,7 @@ class RubroTipo(str, Enum):
     TESIS = "tesis"
     INFORME_TECNICO = "informe_tecnico"
     OTRA_PRODUCCION_CT = "otra_produccion_ct"
+    TRABAJO_EVENTO_NO_PUBLICADO = "trabajo_evento_no_publicado"
 
     # Producciones y servicios
     PRODUCCION_ARTISTICA = "produccion_artistica"
