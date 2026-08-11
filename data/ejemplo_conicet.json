@@ -1,0 +1,72 @@
+[
+  {
+    "codigo_interno": "CON-100234",
+    "rubro": "Artículos publicados en revistas",
+    "titulo_trabajo": "Análisis de sistemas no lineales en dinámica de fluidos",
+    "anio": 2020,
+    "doi": "10.1234/REV.2020.001",
+    "isbn": null,
+    "publicacion": "Revista Argentina de Matemática Aplicada",
+    "autores_lista": "Bavio, J.M.; Pérez, A."
+  },
+  {
+    "codigo_interno": "CON-100235",
+    "rubro": "Libros",
+    "titulo_trabajo": "Introducción a la Teoría de Números",
+    "anio": 2018,
+    "doi": null,
+    "isbn": "9789500000011",
+    "publicacion": "Editorial Universitaria",
+    "autores_lista": "Bavio, J.M."
+  },
+  {
+    "codigo_interno": "CON-100236",
+    "rubro": "Publicaciones Periódicas",
+    "titulo_trabajo": "Modelos estocásticos aplicados a series temporales económicas",
+    "anio": 2021,
+    "doi": null,
+    "isbn": null,
+    "publicacion": "Revista de Economía Cuantitativa",
+    "autores_lista": "Gómez, M.; Bavio, J.M."
+  },
+  {
+    "codigo_interno": "CON-100237",
+    "rubro": "Publicaciones Periódicas",
+    "titulo_trabajo": "Evaluación de algoritmos de machine learning para clasificación de imágenes satelitales",
+    "anio": 2022,
+    "doi": null,
+    "isbn": null,
+    "publicacion": "Revista Iberoamericana de Inteligencia Artificial",
+    "autores_lista": "Bavio, J.M."
+  },
+  {
+    "codigo_interno": "CON-100238",
+    "rubro": "Cargos Docentes",
+    "titulo_trabajo": "Cátedra de Análisis Matemático II - Profesor Adjunto",
+    "anio": 2019,
+    "doi": null,
+    "isbn": null,
+    "publicacion": null,
+    "autores_lista": ""
+  },
+  {
+    "codigo_interno": "CON-100239",
+    "rubro": "Formación de Recursos Humanos",
+    "titulo_trabajo": "Dirección de becario doctoral - Tema: Redes neuronales aplicadas a bioinformática",
+    "anio": 2021,
+    "doi": null,
+    "isbn": null,
+    "publicacion": null,
+    "autores_lista": "Bavio, J.M."
+  },
+  {
+    "codigo_interno": "CON-100240",
+    "rubro": "Artículos publicados en revistas",
+    "titulo_trabajo": "Nuevas técnicas de regularización en modelos de aprendizaje profundo",
+    "anio": 2024,
+    "doi": "10.9999/nue.2024.555",
+    "isbn": null,
+    "publicacion": "Journal of Machine Learning Research",
+    "autores_lista": "Bavio, J.M.; Fernández, R."
+  }
+]

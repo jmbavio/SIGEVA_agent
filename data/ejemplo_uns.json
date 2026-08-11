@@ -1,0 +1,72 @@
+[
+  {
+    "id": "UNS-001",
+    "categoria": "Artículos en Revistas",
+    "titulo": "Análisis de sistemas no lineales en dinámica de fluidos",
+    "anio_publicacion": 2020,
+    "doi": "10.1234/rev.2020.001",
+    "isbn": null,
+    "revista": "Revista Argentina de Matemática Aplicada",
+    "autores": ["Bavio, J.M.", "Pérez, A."]
+  },
+  {
+    "id": "UNS-002",
+    "categoria": "Libros",
+    "titulo": "Introducción a la Teoría de Números",
+    "anio_publicacion": 2018,
+    "doi": null,
+    "isbn": "978-950-000-001-1",
+    "revista": "Editorial Universitaria",
+    "autores": ["Bavio, J.M."]
+  },
+  {
+    "id": "UNS-003",
+    "categoria": "Artículos en Revistas",
+    "titulo": "Modelos estocásticos aplicados a series temporales económicas",
+    "anio_publicacion": 2021,
+    "doi": null,
+    "isbn": null,
+    "revista": "Revista de Economía Cuantitativa",
+    "autores": ["Gómez, M.", "Bavio, J.M."]
+  },
+  {
+    "id": "UNS-004",
+    "categoria": "Artículos en Revistas",
+    "titulo": "Evaluación de algoritmos de aprendizaje automático para clasificación de imágenes satelitales",
+    "anio_publicacion": 2022,
+    "doi": null,
+    "isbn": null,
+    "revista": "Revista Iberoamericana de Inteligencia Artificial",
+    "autores": ["Bavio, J.M."]
+  },
+  {
+    "id": "UNS-005",
+    "categoria": "Docencia",
+    "titulo": "Cátedra de Análisis Matemático II - Profesor Adjunto",
+    "anio_publicacion": 2019,
+    "doi": null,
+    "isbn": null,
+    "revista": null,
+    "autores": []
+  },
+  {
+    "id": "UNS-006",
+    "categoria": "Proyectos",
+    "titulo": "Desarrollo de modelos predictivos para el diagnóstico temprano de enfermedades cardiovasculares",
+    "anio_publicacion": 2023,
+    "doi": null,
+    "isbn": null,
+    "revista": null,
+    "autores": ["Bavio, J.M.", "Rodríguez, L."]
+  },
+  {
+    "id": "UNS-007",
+    "categoria": "Artículos en Revistas",
+    "titulo": "Optimización de redes neuronales convolucionales mediante algoritmos genéticos",
+    "anio_publicacion": 2020,
+    "doi": "10.5555/opt.2020.777",
+    "isbn": null,
+    "revista": "Journal of Computational Intelligence",
+    "autores": ["Bavio, J.M."]
+  }
+]

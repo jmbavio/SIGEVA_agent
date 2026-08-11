@@ -1,0 +1,7 @@
+langgraph>=0.2
+langchain>=0.3
+langchain-openai>=0.2
+langchain-google-genai>=2.0
+pydantic>=2.7
+rapidfuzz>=3.9
+python-dotenv>=1.0
