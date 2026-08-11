@@ -20,18 +20,45 @@ class InstanciaSigeva(str, Enum):
 
 
 class RubroTipo(str, Enum):
-    """Categoría homologada del antecedente. `rubro_original` conserva la
-    etiqueta tal cual la usa cada instancia (pueden diferir en texto aunque
-    refieran al mismo rubro, ej. "Artículos en Revistas" vs "Publicaciones
-    Periódicas")."""
+    """Categoría homologada del antecedente, basada en la taxonomía del
+    "Banco de Datos" de SIGEVA/CONICET (Publicaciones, Formación de RRHH,
+    Cargos, Financiamiento CyT, Evaluación, Extensión, Producciones y
+    Servicios). `rubro_original` conserva la etiqueta tal cual la usa cada
+    instancia (pueden diferir en texto aunque refieran al mismo rubro, ej.
+    "Artículos en Revistas" vs "Publicaciones Periódicas")."""
 
-    ARTICULO = "articulo"
+    # Publicaciones
+    ARTICULO = "articulo"  # Artículos publicados en revistas
     LIBRO = "libro"
-    CAPITULO_LIBRO = "capitulo_libro"
-    DOCENCIA = "docencia"
-    PROYECTO = "proyecto"
-    DIRECCION_TESIS = "direccion_tesis"
+    CAPITULO_LIBRO = "capitulo_libro"  # Partes de libros
+    TRABAJO_EVENTO = "trabajo_evento"  # Congresos/ponencias publicados
+    TESIS = "tesis"
+    INFORME_TECNICO = "informe_tecnico"
+    OTRA_PRODUCCION_CT = "otra_produccion_ct"
+
+    # Producciones y servicios
+    PRODUCCION_ARTISTICA = "produccion_artistica"
+    DESARROLLO_TECNOLOGICO = "desarrollo_tecnologico"
+    SERVICIO = "servicio"
     PATENTE = "patente"
+
+    # Cargos
+    DOCENCIA = "docencia"
+    CARGO_ID = "cargo_id"  # Cargos en organismos científico-tecnológicos
+    CARGO_GESTION = "cargo_gestion"  # Cargos en gestión institucional
+
+    # Financiamiento CyT
+    PROYECTO = "proyecto"  # Proyectos de I+D, extensión, vinculación
+    SUBSIDIO = "subsidio"
+
+    # Formación de RRHH en CyT (dirección de becarios/tesistas/investigadores)
+    DIRECCION_BECARIO = "direccion_becario"
+    DIRECCION_TESIS = "direccion_tesis"
+    DIRECCION_INVESTIGADOR = "direccion_investigador"
+
+    # Otros
+    EVALUACION = "evaluacion"
+    EXTENSION = "extension"
     OTRO = "otro"
 
 
