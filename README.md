@@ -80,6 +80,28 @@ comparten el mismo layout de secciones (mismo software SIGEVA, distinta
 marca institucional), así que sirve para cualquiera sin cambios — validado
 contra exports reales de tres de las cuatro (UNS, CIC, CONICET).
 
+## Deploy en Streamlit Community Cloud
+
+1. Pusheá el repo a GitHub (ya lo está) y entrá a
+   [share.streamlit.io](https://share.streamlit.io).
+2. "New app" → elegí el repo, la branch, y como main file path `app.py`.
+   `.python-version` ya fija la versión (3.11) y `requirements.txt` tiene
+   todas las dependencias — no hace falta configurar nada más ahí.
+3. Antes de deployar (o después, en Settings → Secrets), pegá tus claves
+   según la plantilla `.streamlit/secrets.toml.example` — copiá su
+   contenido y completá los valores reales. Sólo hace falta si vas a usar
+   el resolutor LLM; sin secrets configurados, la app funciona igual pero
+   ese checkbox queda sin efecto.
+4. Deploy. Cada usuario sube sus propios PDFs desde el navegador — nada se
+   versiona ni se guarda en el repo ni en Cloud (se procesan en un
+   directorio temporal que se borra al terminar cada comparación).
+
+**Si el link va a quedar público**: cualquiera que lo abra puede tildar el
+checkbox del resolutor LLM y gastar tu API key si configuraste una. Para
+evitarlo, definí el secret `APP_PASSCODE` (ver la plantilla) — la UI va a
+pedir ese passcode antes de habilitar el checkbox. Sin ese secret, el
+checkbox queda libre (pensado para cuando vos sos el único que usa la app).
+
 ## Tests
 
 ```bash

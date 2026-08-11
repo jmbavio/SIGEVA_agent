@@ -11,3 +11,7 @@ venv/
 # quieras y apuntá SIGEVA_RUTA_A/B ahí (ver .env.example).
 *.pdf
 data/pdfs/
+
+# Secrets reales de Streamlit (local o bajados de Cloud) — nunca se
+# versionan. La plantilla sin datos es .streamlit/secrets.toml.example.
+.streamlit/secrets.toml
