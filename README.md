@@ -20,9 +20,10 @@ sigeva_agent/
 │   └── reports/          # generación del reporte de diferencias
 ├── tests/
 ├── data/                 # datos de ejemplo (ficticios, no reales)
+├── app.py                # UI en Streamlit (subir 2 PDFs, ver el reporte en el navegador)
 ├── .env.example
 ├── requirements.txt
-└── main.py
+└── main.py               # mismo flujo por línea de comandos
 ```
 
 ## Instalación
@@ -36,21 +37,35 @@ cp .env.example .env   # sólo necesario si se va a usar el resolutor LLM
 
 ## Uso
 
+### UI (recomendado)
+
+```bash
+streamlit run app.py
+```
+
+Abre una página en el navegador con dos casilleros para subir PDFs de CV
+(uno por instancia), un selector de qué instancia es cada uno, y un botón
+"Comparar" que muestra el reporte de diferencias ahí mismo. Los PDFs se
+procesan en un directorio temporal que se borra al terminar la comparación
+— no se guardan en ningún lado.
+
+### Línea de comandos
+
 ```bash
 python main.py
 ```
 
-Por defecto corre el grafo de diff sobre `data/ejemplo_uns.json` y
-`data/ejemplo_conicet.json` (datos de ejemplo ficticios), e imprime en
-stdout un reporte en Markdown con los antecedentes emparejados (y por qué
-nivel: exacto/estructurado/fuzzy) y los que están sólo en una de las dos
-instancias.
+Mismo flujo, sin UI. Por defecto corre el grafo de diff sobre
+`data/ejemplo_uns.json` y `data/ejemplo_conicet.json` (datos de ejemplo
+ficticios), e imprime en stdout un reporte en Markdown con los
+antecedentes emparejados (y por qué nivel: exacto/estructurado/fuzzy) y
+los que están sólo en una de las dos instancias.
 
-### Usar tus propios PDFs de SIGEVA
+### Usar tus propios PDFs de SIGEVA por línea de comandos
 
 Cada instancia SIGEVA te deja descargar tu "Curriculum vitae" en PDF desde
-tu propio panel. Para correr el diff sobre tus PDFs reales (nunca se
-versionan — ver `.gitignore`), seteá en tu `.env`:
+tu propio panel. Para correr `main.py` sobre tus PDFs reales sin la UI
+(nunca se versionan — ver `.gitignore`), seteá en tu `.env`:
 
 ```bash
 SIGEVA_RUTA_A=/ruta/local/a/tu_cv_uns.pdf
