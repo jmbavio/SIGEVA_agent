@@ -7,13 +7,14 @@ ejemplo específico de esa instancia (hoy sólo hay para UNS/CONICET, son los
 datos de demo versionados en el repo — ver data/README.md)."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from src.extractors.conicet import CONICETJSONExtractor
 from src.extractors.pdf_sigeva import SIGEVAPdfExtractor
 from src.extractors.uns import UNSJSONExtractor
 from src.graph.state import DiffState
-from src.matching.engine import emparejar
+from src.matching.engine import emparejar, resolver_semanticamente
 from src.models.schema import InstanciaSigeva
 from src.reports.reporte import generar_reporte_markdown
 
@@ -54,8 +55,16 @@ def normalize(state: DiffState) -> DiffState:
     return {}
 
 
+def _usar_llm_semantico() -> bool:
+    return os.getenv("SIGEVA_USAR_LLM_SEMANTICO", "").strip().lower() in ("1", "true", "si", "sí")
+
+
 def match(state: DiffState) -> DiffState:
     resultado = emparejar(state["items_a"], state["items_b"])
+    if _usar_llm_semantico():
+        from src.matching.llm_semantic import ResolutorSemanticoLangChain
+
+        resultado = resolver_semanticamente(resultado, ResolutorSemanticoLangChain())
     return {"resultado": resultado}
 
 

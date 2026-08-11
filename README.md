@@ -15,7 +15,7 @@ sigeva_agent/
 ├── src/
 │   ├── graph/          # grafo de estados (LangGraph)
 │   ├── extractors/      # lectura de exports de cada instancia SIGEVA (PDF/JSON)
-│   ├── matching/        # diff engine: exact / structured / fuzzy (+ gancho LLM)
+│   ├── matching/        # diff engine: exact / structured / fuzzy + resolutor semántico LLM (opcional)
 │   ├── models/           # esquema homologado de antecedente (Pydantic)
 │   └── reports/          # generación del reporte de diferencias
 ├── tests/
@@ -84,11 +84,29 @@ Prioridad de matching, en `src/matching/engine.py`:
 3. **Fuzzy match** — similitud de Levenshtein sobre el título normalizado,
    con umbral configurable (`umbral_fuzzy`, default 85).
 
-Lo que no matchea en ninguno de los tres niveles queda disponible para un
-futuro resolutor semántico vía LLM (`src/matching/llm_semantic.py` — sólo
-la interfaz, todavía no implementado) para casos ambiguos como rubros con
-etiquetas distintas entre plataformas (ej. "Artículos en Revistas" vs
-"Publicaciones Periódicas").
+Lo que no matchea en ninguno de los tres niveles queda disponible para una
+4ta pasada opcional: el resolutor semántico vía LLM
+(`src/matching/llm_semantic.py`). Es una llamada aparte
+(`resolver_semanticamente`, en `src/matching/engine.py`), no algo que
+`emparejar` haga automáticamente — así los 3 niveles de siempre siguen
+siendo gratis e instantáneos. Se activa poniendo
+`SIGEVA_USAR_LLM_SEMANTICO=true` en el `.env` (default: apagado). Cuando
+está prendido:
+
+1. Para cada ítem sin match, arma una lista acotada de candidatos del otro
+   lado con año igual o ±1, priorizados por similitud de título aunque no
+   lleguen al umbral fuzzy (hasta 5, para no volar el costo/tokens por
+   llamada).
+2. Si hay al menos un candidato, le pregunta al modelo elegido
+   (`LLM_PROVIDER=openai` → gpt-4o-mini, `=gemini` → gemini-1.5-flash) si
+   alguno es el mismo antecedente pese a estar redactado distinto o
+   clasificado bajo otro rubro — con salida estructurada (Pydantic), no
+   parseo de texto libre.
+3. Si no hay candidatos con año cercano, no llama al LLM para ese ítem (no
+   gasta una consulta al pedo).
+
+Los pares que resuelve así quedan marcados con nivel `Semántico (LLM)` en
+el reporte, distinguibles de los otros tres.
 
 ## El parser de PDF: qué sí y qué no
 
